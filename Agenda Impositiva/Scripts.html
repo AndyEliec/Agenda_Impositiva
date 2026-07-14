@@ -1,0 +1,533 @@
+<script>
+  const state = {
+    token: sessionStorage.getItem('agenda_token'),
+    user: null,
+    estados: [],
+    view: 'dashboard',
+    calendarItems: [],
+    dashboardItems: [],
+    clientesCache: [] // Memoria local para resolver IDs a nombres reales en vivo
+  };
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+  document.addEventListener('DOMContentLoaded', init);
+
+  // --- INICIALIZACIÓN DE LA SPA ---
+  function init() {
+    if (localStorage.getItem('agenda_theme') === 'dark') document.body.classList.add('dark');
+    if (!state.token) return renderLogin();
+    
+    server('apiBootstrap', state.token).then(data => {
+      state.user = data.usuario;
+      state.estados = data.estados;
+      return server('apiListClientes', state.token);
+    }).then(clientes => {
+      state.clientesCache = clientes;
+      renderLayout();
+    }).catch(() => {
+      sessionStorage.removeItem('agenda_token');
+      state.token = null;
+      renderLogin();
+    });
+  }
+
+  function server(fn, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(result => result && result.ok === false ? reject(new Error(result.error)) : resolve(result))
+        .withFailureHandler(reject)[fn](...args);
+    });
+  }
+
+  function template(id) { return document.getElementById(id).innerHTML; }
+
+  // FUNCIÓN AUXILIAR DE RENDERIZADO DE CARDS KPI
+  function kpi(label, value, icon) {
+    return `<div class="col-md-3"><div class="card-ui p-3"><div class="muted"><i class="bi ${icon} me-2"></i>${label}</div><div class="display-6 fw-bold">${value}</div></div></div>`;
+  }
+
+  // --- MANEJO DE LOGIN INTERACTIVO ---
+  function renderLogin() {
+    $('#app').innerHTML = template('login-template');
+    const toggleBtn = $('[data-action="toggle-theme"]');
+    if (toggleBtn) toggleBtn.addEventListener('click', toggleTheme);
+  }
+
+  function ejecutarIngresoSistema(event) {
+    event.preventDefault();
+    const txtUser = document.getElementById('login-usuario').value;
+    const txtPass = document.getElementById('login-password').value;
+    const btnSubmit = document.getElementById('btn-login-submit');
+    const errorDiv = document.getElementById('login-error');
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Verificando...';
+    errorDiv.classList.add('d-none');
+
+    server('apiLogin', txtUser, txtPass, navigator.userAgent).then(data => {
+      state.token = data.token;
+      state.user = { usuario: data.usuario, nombre: data.nombre, rol: data.rol };
+      sessionStorage.setItem('agenda_token', data.token);
+      return server('apiListClientes', data.token);
+    }).then(clientes => {
+      state.clientesCache = clientes;
+      renderLayout();
+    }).catch(err => {
+      errorDiv.innerText = err.message || "Usuario o contraseña inválidos.";
+      errorDiv.classList.remove('d-none');
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = 'Ingresar al Panel';
+    });
+  }
+
+  function renderLayout() {
+    $('#app').innerHTML = template('layout-template');
+    $('#user-label').textContent = `${state.user.nombre || state.user.usuario} · ${state.user.rol}`;
+    $$('.admin-only').forEach(el => el.style.display = state.user.rol === 'ADMIN' ? '' : 'none');
+    $$('[data-view]').forEach(link => link.addEventListener('click', () => setView(link.dataset.view)));
+    $('[data-action="logout"]').addEventListener('click', logout);
+    $('[data-action="toggle-theme"]').addEventListener('click', toggleTheme);
+    setView(state.view);
+  }
+
+  function setView(view) {
+    state.view = view;
+    $$('.nav-link').forEach(link => link.classList.toggle('active', link.dataset.view === view));
+    $('#view').innerHTML = template(`${view}-template`);
+    const handler = { dashboard: loadDashboard, calendario: loadCalendar, clientes: loadClientes, impuestos: loadImpuestos, usuarios: loadUsuarios }[view];
+    if (handler) handler();
+  }
+
+  function logout() {
+    server('apiLogout', state.token).finally(() => {
+      sessionStorage.removeItem('agenda_token');
+      state.token = null;
+      renderLogin();
+    });
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('dark');
+    localStorage.setItem('agenda_theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+  }
+
+  function currentMonthValue(offset = 0) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function splitMonth(value) {
+    const [year, month] = value.split('-').map(Number);
+    return { year, month };
+  }
+
+  function estadoClass(estado) { return 'estado-' + String(estado).replace(/\s+/g, '-'); }
+
+  // ===================================================
+  // DASHBOARD CONTROLLER
+  // ===================================================
+  function loadDashboard() {
+    const input = $('#dash-month');
+    if (input) {
+      input.value = currentMonthValue();
+      input.addEventListener('change', refreshDashboard);
+    }
+  
+    const btnGenerar = $('#btn-generar');
+    if (btnGenerar) {
+      btnGenerar.addEventListener('click', () => {
+        const m = splitMonth(currentMonthValue(1));
+        server('apiGenerarVencimientos', state.token, m.year, m.month).then(result => {
+          alert(`Proceso finalizado. Creados: ${result.creados}. Omitidos en base: ${result.omitidos}.`);
+          refreshDashboard();
+        }).catch(err => alert(err.message));
+      });
+    }
+ 
+    refreshDashboard();
+  }
+  
+  function refreshDashboard() {
+    const inputMonth = $('#dash-month');
+    if (!inputMonth) return;
+    
+    const m = splitMonth(inputMonth.value);
+    server('apiDashboard', state.token, m.year, m.month).then(data => {
+      state.dashboardItems = data.proximos;
+      
+      const kpiRow = $('#kpi-row');
+      if (kpiRow) {
+        kpiRow.innerHTML = [
+          kpi('Total', data.total, 'bi-list-task'),
+          kpi('Presentados', data.presentados, 'bi-check2-circle'),
+          kpi('Progreso', data.progreso + '%', 'bi-graph-up'),
+          kpi('Pendientes', data.byEstado.Pendiente || 0, 'bi-exclamation-circle')
+        ].join('');
+      }
+      
+      const dashTable = $('#dash-table');
+      if (dashTable) {
+        dashTable.innerHTML = data.proximos.map(row => `
+          <tr>
+            <td>${row.Fecha_Vto}</td>
+            <td><strong>${row.Cliente}</strong></td>
+            <td>${row.Impuesto}</td>
+            <td><span class="task-pill ${estadoClass(row.Estado)}">${row.Estado}</span></td>
+            <td><button type="button" class="btn btn-outline-secondary btn-xs" onclick="abrirModalDesdeDashboard('${row.ID_Vencimiento}')"><i class="bi bi-pencil-square"></i></button></td>
+          </tr>
+        `).join('') || '<tr><td colspan="5" class="muted text-center py-3">Sin datos este mes</td></tr>';
+      }
+    }).catch(err => alert(err.message));
+  }
+
+  const ESTADOS_FALLBACK = ['Pendiente', 'En Proceso', 'Para Control', 'Para Presentar', 'Presentado'];
+
+  function abrirModalDesdeDashboard(id) {
+    const item = state.dashboardItems.find(row => row.ID_Vencimiento === id);
+    if (!item) return;
+
+    const form = $('#dash-task-form');
+    if (!form) return;
+
+    const estados = state.estados.length ? state.estados : ESTADOS_FALLBACK;
+    const selectDesplegable = document.getElementById('dash-modal-select-estado') || form.Estado;
+
+    if (selectDesplegable) {
+      selectDesplegable.innerHTML = estados.map(e => `<option value="${e}">${e}</option>`).join('');
+      selectDesplegable.value = item.Estado;
+    }
+
+    // Asignamos el resto de los campos ocultos y comentarios
+    form.ID_Vencimiento.value = id;
+    form.Comentario.value = item.Comentario || '';
+
+    const title = $('#dash-task-title');
+    if (title) {
+      title.textContent = `${item.Cliente} · ${item.Impuesto}`;
+    }
+
+    // Abrimos el modal de Bootstrap de forma interactiva
+    bootstrap.Modal.getOrCreateInstance($('#dash-task-modal')).show();
+  }
+
+  function saveDashTask(e) {
+    e.preventDefault();
+    const form = Object.fromEntries(new FormData(e.currentTarget).entries());
+    server('apiUpdateVencimiento', state.token, form.ID_Vencimiento, { Estado: form.Estado, Comentario: form.Comentario }).then(() => {
+      bootstrap.Modal.getInstance($('#dash-task-modal')).hide();
+      refreshDashboard();
+    }).catch(err => alert(err.message));
+  }
+
+  // ===================================================
+  // CALENDARIO CONTROLLER
+  // ===================================================
+  function loadCalendar() {
+    const input = $('#cal-month');
+    if (input) {
+      input.value = currentMonthValue();
+      input.addEventListener('change', refreshCalendar);
+    }
+  
+    const formCal = $('#task-form');
+    const estados = state.estados.length ? state.estados : ESTADOS_FALLBACK;
+    if (formCal && formCal.Estado) {
+      formCal.Estado.innerHTML = estados.map(e => `<option value="${e}">${e}</option>`).join('');
+    }
+
+    if (formCal) {
+      formCal.addEventListener('submit', saveTask);
+    }
+    refreshCalendar();
+  }
+
+  function refreshCalendar() {
+    const inputCal = $('#cal-month');
+    if (!inputCal) return;
+    const m = splitMonth(inputCal.value);
+    server('apiCalendar', state.token, m.year, m.month).then(data => {
+      state.calendarItems = data.vencimientos;
+      drawCalendar(m.year, m.month, data.vencimientos, data.feriados || []);
+    }).catch(err => alert(err.message));
+  }
+
+  function drawCalendar(year, month, items, feriadosLista) {
+    const grid = $('#calendar-grid');
+    if (!grid) return;
+    const first = new Date(year, month - 1, 1);
+    const last = new Date(year, month, 0);
+    const pad = (first.getDay() + 6) % 7;
+
+    const byDay = items.reduce((acc, item) => {
+      const day = Number(item.Fecha_ISO.slice(-2));
+      (acc[day] ||= []).push(item);
+      return acc;
+    }, {});
+
+    let html = '';
+    for (let i = 0; i < pad; i++) html += '<div></div>';
+
+    for (let day = 1; day <= last.getDate(); day++) {
+      const strFecha = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const esFeriado = feriadosLista.includes(strFecha);
+    
+      const estiloCelda = esFeriado ? 'style="background-color: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2);"' : '';
+      const cartelFeriado = esFeriado ? '<span class="text-danger float-end text-uppercase" style="font-size: 0.65rem; font-weight: bold;"><i class="bi bi-flag-fill me-1"></i>Feriado</span>' : '';
+
+      html += `
+        <div class="day-cell" ${estiloCelda}>
+          <div class="day-number">
+            ${day}
+            ${cartelFeriado}
+          </div>
+          ${(byDay[day] || []).map(item => `
+            <div class="task-pill ${estadoClass(item.Estado)}" data-task="${item.ID_Vencimiento}">
+              <strong>${item.Cliente}</strong><br>${item.Impuesto}
+            </div>
+          `).join('')}
+        </div>`;
+    }
+    grid.innerHTML = html;
+    $$('[data-task]').forEach(el => el.addEventListener('click', () => openTask(el.dataset.task)));
+  }
+
+  function openTask(id) {
+    const item = state.calendarItems.find(row => row.ID_Vencimiento === id);
+    const form = $('#task-form');
+    form.ID_Vencimiento.value = id;
+    form.Estado.value = item.Estado;
+    form.Comentario.value = item.Comentario || '';
+    $('#task-title').textContent = `${item.Cliente} · ${item.Impuesto}`;
+    bootstrap.Modal.getOrCreateInstance($('#task-modal')).show();
+  }
+
+  function saveTask(event) {
+    event.preventDefault();
+    const form = Object.fromEntries(new FormData(event.currentTarget).entries());
+    server('apiUpdateVencimiento', state.token, form.ID_Vencimiento, { Estado: form.Estado, Comentario: form.Comentario }).then(() => {
+      bootstrap.Modal.getInstance($('#task-modal')).hide();
+      refreshCalendar();
+    }).catch(err => alert(err.message));
+  }
+
+  // ===================================================
+  // CLIENTES CONTROLLER
+  // ===================================================
+  function loadClientes() {
+    const form = $('#cliente-form');
+    if (form) {
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        server('apiSaveCliente', state.token, Object.fromEntries(new FormData(event.currentTarget).entries())).then(() => {
+          event.currentTarget.reset();
+          event.currentTarget.ID_Cliente.value = '';
+          loadClientes();
+        }).catch(err => alert(err.message));
+      });
+    }
+    
+    $('#btn-limpiar-cliente')?.addEventListener('click', () => {
+      const f = $('#cliente-form');
+      if (f) {
+        f.reset();
+        f.ID_Cliente.value = '';
+      }
+    });
+
+    renderTablaClientes();
+  }
+
+  function renderTablaClientes() {
+    server('apiListClientes', state.token).then(rows => {
+      state.clientesCache = rows;
+      const tablaClientes = $('#clientes-table');
+      if (tablaClientes) {
+        tablaClientes.innerHTML = rows.map(row => `
+          <tr>
+            <td><strong>${row.Cliente}</strong></td>
+            <td class="font-mono text-sm">${row.Cuit}</td>
+            <td>${row.Email || '-'}</td>
+            <td><span class="badge ${row.Activo === 'SI' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${row.Activo}</span></td>
+            <td>
+              <button class="btn btn-outline-primary btn-sm px-2 py-0" onclick="editarClienteCarga('${row.ID_Cliente}')"><i class="bi bi-pencil text-primary"></i></button>
+              <button class="btn btn-outline-warning btn-sm px-2 py-0" onclick="switchEstadoCliente('${row.ID_Cliente}', '${row.Activo}')"><i class="bi bi-power text-warning"></i></button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    });
+  }
+
+  function editarClienteCarga(id) {
+    const c = state.clientesCache.find(r => r.ID_Cliente === id);
+    if (!c) return;
+    const f = $('#cliente-form');
+    f.ID_Cliente.value = c.ID_Cliente;
+    f.Cliente.value = c.Cliente;
+    f.Cuit.value = c.Cuit;
+    f.TelegramId.value = c.TelegramId || '';
+    f.Email.value = c.Email || '';
+    f.Cliente.focus();
+  }
+
+  function switchEstadoCliente(id, estadoActual) {
+    const prox = estadoActual === 'SI' ? 'NO' : 'SI';
+    server('apiCambiarEstadoCliente', state.token, id, prox).then(() => { loadClientes(); }).catch(err => alert(err.message));
+  }
+
+  // ===================================================
+  // IMPUESTOS & ASIGNACIONES CONTROLLER
+  // ===================================================
+  function loadImpuestos() {
+    server('apiListImpuestos', state.token).then(rows => {
+      const tablaImpuestos = $('#impuestos-table');
+      if (tablaImpuestos) {
+        tablaImpuestos.innerHTML = rows.map(row => `
+          <tr>
+            <td><code>${row.ID_Impuesto}</code></td>
+            <td><strong>${row.Nombre_Impuesto}</strong></td>
+            <td><span class="badge ${row.Activo === 'SI' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${row.Activo}</span></td>
+            <td><button class="btn btn-outline-primary btn-sm py-0" onclick="cargarImpuestoForm('${row.ID_Impuesto}', '${row.Nombre_Impuesto}', '${row.Activo}')"><i class="bi bi-pencil text-primary"></i></button></td>
+          </tr>
+        `).join('');
+      }
+
+      const comboRegla = $('#regla-select-impuesto');
+      if (comboRegla) comboRegla.innerHTML = rows.filter(r => r.Activo === 'SI').map(r => `<option value="${r.Nombre_Impuesto}">${r.Nombre_Impuesto}</option>`).join('');
+      const comboAsig = $('#asig-select-impuesto');
+      if (comboAsig) comboAsig.innerHTML = rows.filter(r => r.Activo === 'SI').map(r => `<option value="${r.Nombre_Impuesto}">${r.Nombre_Impuesto}</option>`).join('');
+    });
+
+    server('apiListCalendarios', state.token).then(rows => {
+      const t = $('#reglas-calendario-table');
+      if (t) t.innerHTML = rows.map(r => `<tr><td><strong>${r.Impuesto}</strong></td><td class="text-capitalize">${r.Mes}</td><td>Terminados en ${r.Desde_Digito} a ${r.Hasta_Digito}</td><td>Día ${r.Dia_Vencimiento}</td></tr>`).join('');
+    });
+
+    server('apiListClientes', state.token).then(clientes => {
+      state.clientesCache = clientes;
+      const c = $('#asig-select-cliente');
+      if (c) c.innerHTML = clientes.filter(row => row.Activo === 'SI').map(row => `<option value="${row.ID_Cliente}">${row.Cliente}</option>`).join('');
+      return server('apiListImpuestosAsignados', state.token);
+    }).then(asig => {
+      const t = $('#asignaciones-table');
+      if (t) {
+        t.innerHTML = asig.map(r => {
+          const matchedCliente = state.clientesCache.find(c => c.ID_Cliente === r.ID_Cliente);
+          const razonSocial = matchedCliente ? matchedCliente.Cliente : r.ID_Cliente;
+          
+          // CORRECCIÓN: Botón de tacho de basura integrado de forma global en la fila
+          return `
+            <tr>
+              <td><strong>${razonSocial}</strong> <small class="text-muted font-mono">(${r.ID_Cliente})</small></td>
+              <td><span class="badge bg-primary-subtle text-primary">${r.Impuesto}</span></td>
+              <td>${r.Observaciones || '-'}</td>
+              <td>
+                <button type="button" class="btn btn-outline-danger btn-sm px-2 py-0" onclick="eliminarAsignacionTributaria('${r.ID_Cliente}', '${r.Impuesto.replace(/'/g, "\\'")}')">
+                  <i class="bi bi-trash text-danger"></i>
+                </button>
+              </td>
+            </tr>`;
+        }).join('');
+      }
+    });
+
+    const formImp = $('#impuesto-form');
+    if (formImp) {
+      formImp.addEventListener('submit', event => {
+        event.preventDefault();
+        server('apiSaveImpuesto', state.token, Object.fromEntries(new FormData(event.currentTarget).entries())).then(() => {
+          event.currentTarget.reset();
+          event.currentTarget.ID_Impuesto.value = '';
+          loadImpuestos();
+        }).catch(err => alert(err.message));
+      });
+    }
+  }
+
+  function cargarImpuestoForm(id, nombre, activo) {
+    const f = $('#impuesto-form');
+    if (f) {
+      f.ID_Impuesto.value = id;
+      f.Nombre_Impuesto.value = nombre;
+      f.Activo.value = activo;
+    }
+  }
+
+  function guardarReglaCalendario(e) {
+    e.preventDefault();
+    server('apiSaveCalendario', state.token, Object.fromEntries(new FormData(e.currentTarget).entries())).then(() => { e.target.reset(); loadImpuestos(); }).catch(err => alert(err.message));
+  }
+
+  function guardarAsignacionCliente(e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const formData = Object.fromEntries(new FormData(form).entries());
+
+    server('apiSaveAsignacion', state.token, formData)
+      .then(result => {
+        form.reset();
+        alert('✅ Impuesto vinculado correctamente al legajo del cliente.');
+        loadImpuestos();
+      })
+      .catch(err => alert('Error de asignación: ' + err.message));
+  }
+
+  // CORRECCIÓN UBICACIÓN: Sacamos la función afuera de loadImpuestos() para hacerla global
+  function eliminarAsignacionTributaria(idCliente, impuesto) {
+    const matchedCliente = state.clientesCache.find(c => c.ID_Cliente === idCliente);
+    const nombreEmpresa = matchedCliente ? matchedCliente.Cliente : idCliente;
+
+    if (!confirm(`¿Está seguro que desea eliminar la asignación del impuesto "${impuesto}" para el cliente "${nombreEmpresa}"?`)) {
+      return;
+    }
+
+    server('apiEliminarAsignacion', state.token, idCliente, impuesto)
+      .then(() => {
+        loadImpuestos(); // Recarga la solapa en caliente de forma transparente
+      })
+      .catch(err => alert('Error al eliminar asignación: ' + err.message));
+  }
+
+  // ===================================================
+  // USUARIOS CONTROLLER
+  // ===================================================
+  function loadUsuarios() {
+    server('apiListUsuarios', state.token).then(rows => {
+      const tablaUsr = $('#usuarios-table');
+      if (tablaUsr) {
+        tablaUsr.innerHTML = rows.map(row => `
+          <tr>
+            <td><strong>${row.Nombre_Completo}</strong></td>
+            <td><code>${row.Usuario}</code></td>
+            <td><span class="badge bg-secondary-subtle text-light">${row.Rol}</span></td>
+            <td><span class="badge ${row.Activo === 'SI' ? 'bg-success-subtle text-success' : 'bg-danger-subtle text-danger'}">${row.Activo}</span></td>
+            <td>
+              <button class="btn btn-outline-warning btn-sm py-0" onclick="cambiarEstadoUsuario('${row.ID_Usuario}', '${row.Activo}')"><i class="bi bi-power text-warning"></i></button>
+              <button class="btn btn-outline-danger btn-sm py-0" onclick="forzarNuevaClave('${row.ID_Usuario}')"><i class="bi bi-key text-danger"></i></button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }).catch(err => alert(err.message));
+  }
+
+  function guardarNuevoUsuario(e) {
+    e.preventDefault();
+    server('apiCreateUsuario', state.token, Object.fromEntries(new FormData(e.currentTarget).entries())).then(() => { e.target.reset(); loadUsuarios(); }).catch(err => alert(err.message));
+  }
+
+  function cambiarEstadoUsuario(id, estadoActual) {
+    const prox = estadoActual === 'SI' ? 'NO' : 'SI';
+    if (!confirm(`¿Desea cambiar el acceso del operador a: ${prox}?`)) return;
+    server('apiCambiarEstadoUsuario', state.token, id, prox).then(() => { loadUsuarios(); }).catch(err => alert(err.message));
+  }
+
+  function forzarNuevaClave(id) {
+    const nueva = prompt("Ingrese la nueva contraseña para este operador:");
+    if (!nueva || nueva.trim().length < 4) return alert("Clave inválida o muy corta.");
+    server('apiModificarPasswordUsuario', state.token, id, nueva).then(() => { alert("Contraseña actualizada con éxito en SHA-256"); }).catch(err => alert(err.message));
+  }
+</script>

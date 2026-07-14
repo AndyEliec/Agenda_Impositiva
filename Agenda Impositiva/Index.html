@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agenda Impositiva</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <div id="app"></div>
+    <template id="login-template"><?!= include('Login'); ?></template>
+    <template id="layout-template"><?!= include('Layout'); ?></template>
+    <template id="dashboard-template"><?!= include('Dashboard'); ?></template>
+    <template id="calendario-template"><?!= include('Calendario'); ?></template>
+    <template id="clientes-template"><?!= include('Clientes'); ?></template>
+    <template id="impuestos-template"><?!= include('Impuestos'); ?></template>
+    <template id="usuarios-template"><?!= include('Usuarios'); ?></template>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <?!= include('Scripts'); ?>
+  </body>
+</html>
+

@@ -1,0 +1,43 @@
+<div class="container-fluid py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1">Contribuyentes</h2>
+      <p class="muted mb-0">Alta y modificación de legajos y estados de clientes</p>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" id="btn-limpiar-cliente"><i class="bi bi-plus-circle me-1"></i>Nuevo Registro</button>
+  </div>
+
+  <div class="card-ui p-4 mb-4">
+    <form id="cliente-form" class="row g-3">
+      <input type="hidden" name="ID_Cliente">
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold text-muted">Razón Social / Nombre</label>
+        <input class="form-control" name="Cliente" placeholder="Ej: Transportes SRL" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted">CUIT (Solo números)</label>
+        <input class="form-control" name="Cuit" placeholder="Ej: 30715894269" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold text-muted">Telegram Chat ID</label>
+        <input class="form-control" name="TelegramId" placeholder="Ej: 5887114391">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold text-muted">Correo Electrónico</label>
+        <input class="form-control" type="email" name="Email" placeholder="ejemplo@correo.com">
+      </div>
+      <div class="col-12 text-end">
+        <button class="btn btn-brand px-4" type="submit">Guardar Datos de Cliente</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card-ui p-3 table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr><th>Cliente</th><th>CUIT</th><th>Email</th><th>Estado</th><th>Acciones</th></tr>
+      </thead>
+      <tbody id="clientes-table"></tbody>
+    </table>
+  </div>
+</div>

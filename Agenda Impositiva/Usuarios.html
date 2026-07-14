@@ -1,0 +1,53 @@
+<div class="container-fluid py-4">
+  <div class="mb-4">
+    <h2 class="mb-1">Cuentas y Operadores</h2>
+    <p class="muted mb-0">Alta de personal, suspensión de accesos y re-configuración de claves.</p>
+  </div>
+
+  <div class="row g-3">
+    <!-- PANEL IZQUIERDO: ALTA Y MODIFICACIÓN -->
+    <div class="col-md-4">
+      <div class="card-ui p-4 sticky-top" style="top: 20px;">
+        <h5 class="mb-3 text-primary fw-bold" id="user-form-title">Registrar Operador</h5>
+        <form id="usuario-form" onsubmit="guardarNuevoUsuario(event)">
+          <div class="mb-3">
+            <label class="form-label small fw-medium">Usuario (Alias)</label>
+            <input class="form-control" name="usuario" id="user-input-alias" placeholder="Ej: mrodriguez" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-light fw-medium">Nombre Completo</label>
+            <input class="form-control" name="nombre" placeholder="Ej: Mariana Rodríguez" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-light fw-medium">Correo Electrónico</label>
+            <input class="form-control" type="email" name="email" placeholder="mail@estudio.com" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small text-light fw-medium">Contraseña / Password</label>
+            <input class="form-control" type="password" name="password" id="user-input-pass" placeholder="Mínimo 6 caracteres" required>
+            <small class="text-warning text-xs d-none" id="pass-warning-txt">Sólamente complete si desea cambiar la clave.</small>
+          </div>
+          <div class="mb-4">
+            <label class="form-label small text-light fw-medium">Rol Asignado</label>
+            <select class="form-select" name="rol">
+              <option value="OPERADOR">OPERADOR</option>
+              <option value="SUPERVISOR">SUPERVISOR</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+          </div>
+          <button class="btn btn-brand w-100" type="submit">Guardar Operador</button>
+        </form>
+      </div>
+    </div>
+    
+    <!-- PANEL DERECHO: LISTADO -->
+    <div class="col-md-8">
+      <div class="card-ui p-3 table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol</th><th>Activo</th><th>Acción</th></tr></thead>
+          <tbody id="usuarios-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

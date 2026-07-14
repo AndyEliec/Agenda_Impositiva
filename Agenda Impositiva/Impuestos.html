@@ -1,0 +1,124 @@
+<div class="container-fluid py-4">
+  <div class="mb-4">
+    <h2 class="mb-1">Estructura Tributaria</h2>
+    <p class="muted mb-0">Configuración de impuestos, matriz de vencimientos y asignación a contribuyentes.</p>
+  </div>
+
+  <ul class="nav nav-tabs mb-4 border-secondary-subtle" id="taxTabs" role="tablist">
+    <li class="nav-item">
+      <button class="nav-link active" id="base-tab" data-bs-toggle="tab" data-bs-target="#tab-base" type="button"><i class="bi bi-receipt me-1"></i>Maestro Impuestos</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="reglas-tab" data-bs-toggle="tab" data-bs-target="#tab-reglas" type="button"><i class="bi bi-calendar-range me-1"></i>Matriz Vencimientos (Calendarios)</button>
+    </li>
+    <li class="nav-item">
+      <button class="nav-link" id="asig-tab" data-bs-toggle="tab" data-bs-target="#tab-asig" type="button"><i class="bi bi-link-45deg me-1"></i>Asignar Impuestos a Clientes</button>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="taxTabsContent">
+    <!-- PESTANA 1: MAESTRO IMPUESTOS -->
+    <div class="tab-pane fade show active" id="tab-base" role="tabpanel">
+      <div class="card-ui p-4 mb-3">
+        <form id="impuesto-form" class="row g-3">
+          <input type="hidden" name="ID_Impuesto">
+          <div class="col-md-8">
+            <label class="form-label small fw-medium text-light">Nombre Oficial del Impuesto</label>
+            <input class="form-control" name="Nombre_Impuesto" placeholder="Ej: IVA DDJJ o SICORE" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-medium text-light">¿Habilitado para liquidar?</label>
+            <select class="form-select" name="Activo"><option value="SI">SI (Activo)</option><option value="NO">NO (Inactivo)</option></select>
+          </div>
+          <div class="col-12 text-end">
+            <button class="btn btn-brand px-4" type="submit">Guardar Impuesto</button>
+          </div>
+        </form>
+      </div>
+      <div class="card-ui p-3 table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>ID Código</th><th>Impuesto Tributario</th><th>Estado</th><th>Acción</th></tr></thead>
+          <tbody id="impuestos-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PESTANA 2: CALENDARIOS FISCALES -->
+    <div class="tab-pane fade" id="tab-reglas" role="tabpanel">
+      <div class="card-ui p-4 mb-3">
+        <form id="regla-form" class="row g-3" onsubmit="guardarReglaCalendario(event)">
+          <div class="col-md-4">
+            <label class="form-label small fw-medium text-light">Seleccionar Impuesto Base</label>
+            <select class="form-select" id="regla-select-impuesto" name="Impuesto" required></select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-medium text-light">Mes Fiscal</label>
+            <select class="form-select" name="Mes" required>
+              <option value="enero">Enero</option><option value="febrero">Febrero</option><option value="marzo">Marzo</option>
+              <option value="abril">Abril</option><option value="mayo">Mayo</option><option value="junio">Junio</option>
+              <option value="julio">Julio</option><option value="agosto">Agosto</option><option value="septiembre">Septiembre</option>
+              <option value="octubre">Octubre</option><option value="noviembre">Noviembre</option><option value="diciembre">Diciembre</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-medium text-light">Desde Dígito CUIT</label>
+            <input class="form-control" type="number" min="0" max="9" name="Desde_Digito" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-medium text-light">Hasta Dígito CUIT</label>
+            <input class="form-control" type="number" min="0" max="9" name="Hasta_Digito" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-medium text-light">Día de Vencimiento</label>
+            <input class="form-control" type="number" min="1" max="31" name="Dia_Vencimiento" required>
+          </div>
+          <div class="col-12 text-end">
+            <button class="btn btn-brand px-4" type="submit">Agregar Regla a Matriz</button>
+          </div>
+        </form>
+      </div>
+      <div class="card-ui p-3 table-responsive">
+        <table class="table">
+          <thead><tr><th>Impuesto</th><th>Mes</th><th>Rango Dígitos CUIT</th><th>Día Vto Teórico</th></tr></thead>
+          <tbody id="reglas-calendario-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PESTANA 3: HOJA IMP_ASIGNADOS -->
+    <div class="tab-pane fade" id="tab-asig" role="tabpanel">
+      <div class="card-ui p-4 mb-3">
+        <form id="asig-form" class="row g-3" onsubmit="guardarAsignacionCliente(event)">
+          <div class="col-md-4">
+            <label class="form-label small fw-medium text-light">Contribuyente (Cliente)</label>
+            <select class="form-select" id="asig-select-cliente" name="ID_Cliente" required></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-medium text-light">Obligación Tributaria a Vincular</label>
+            <select class="form-select" id="asig-select-impuesto" name="Impuesto" required></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-medium text-light">Observación de Carga / Notas</label>
+            <input class="form-control" name="Observaciones" placeholder="Ej: Adjuntar Libro IVA Digital">
+          </div>
+          <div class="col-12 text-end">
+            <button class="btn btn-brand px-4" type="submit">Vincular Obligación Fiscal</button>
+          </div>
+        </form>
+      </div>
+      <div class="card-ui p-3 table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Contribuyente (Cliente)</th>
+              <th>Impuesto Asignado</th>
+              <th>Observaciones Particulares</th>
+              <th>Acción</th> <!-- 👈 Nueva columna de control -->
+            </tr>
+          </thead>
+          <tbody id="asignaciones-table"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>

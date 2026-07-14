@@ -1,0 +1,187 @@
+<style>
+  /* --- PALETA DE COLORES DINÁMICA (MODO DIURNO) --- */
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #cbd5e1;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --brand: #2563eb;
+    --brand-soft: #eff6ff;
+    --input-bg: #ffffff;
+    --input-placeholder: #94a3b8;
+  }
+
+  /* --- PALETA DE COLORES DINÁMICA (MODO OSCURO) --- */
+  body.dark {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --brand: #3b82f6;
+    --brand-soft: #1e3a8a;
+    --input-bg: #0f172a;
+    --input-placeholder: #475569;
+  }
+
+  /* --- REGLAS BASE --- */
+  * { box-sizing: border-box; }
+  
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-main);
+    transition: background .2s ease, color .2s ease;
+  }
+
+  /* Corrección absoluta de títulos y textos en ambos modos */
+  h1, h2, h3, h4, h5, h6, .h2, .h5, .modal-title {
+    color: var(--text-main) !important;
+  }
+
+  .muted, .text-muted {
+    color: var(--text-muted) !important;
+  }
+
+  /* Corrección visual de etiquetas (labels) en formularios */
+  form label, .form-label, label {
+    color: var(--text-main) !important;
+    font-weight: 500;
+    opacity: 0.9;
+  }
+
+  /* Corrección de inputs y sus textos de ejemplo (Placeholders) */
+  .form-control, .form-select {
+    background-color: var(--input-bg) !important;
+    color: var(--text-main) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: .75rem;
+  }
+
+  .form-control::placeholder, .form-control::-webkit-input-placeholder {
+    color: var(--input-placeholder) !important;
+    opacity: 1 !important;
+  }
+
+  /* Componentes UI */
+  .card-ui {
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: .75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  }
+
+  .nav-link { 
+    color: var(--text-muted) !important; 
+    border-radius: .75rem; 
+    padding: .75rem 1rem; 
+    cursor: pointer; 
+    font-weight: 500;
+  }
+  
+  .nav-link.active, .nav-link:hover { 
+    color: var(--brand) !important; 
+    background: var(--brand-soft) !important; 
+  }
+
+  .btn-brand { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn-brand:hover { filter: brightness(1.1); color: #fff; }
+
+  /* Tablas adaptativas */
+  .table { 
+    --bs-table-bg: transparent; 
+    --bs-table-color: var(--text-main); 
+    --bs-table-border-color: var(--border); 
+  }
+
+  /* --- ESTRUCTURA RESPONSIVE (MÓVIL PRIMERO) --- */
+  .app-shell { 
+    display: flex;
+    flex-direction: column; 
+    min-height: 100vh;
+  }
+
+  .sidebar { 
+    background: var(--card); 
+    border-bottom: 1px solid var(--border); 
+    padding: 1.25rem; 
+    width: 100%;
+    position: relative;
+    height: auto;
+  }
+
+  .content { 
+    padding: 1rem; 
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .calendar-grid { 
+    display: grid; 
+    grid-template-columns: repeat(7, minmax(0, 1fr)); 
+    gap: .4rem; 
+  }
+
+  .day-cell { 
+    min-height: 90px; 
+    padding: .4rem; 
+    background: var(--card); 
+    border: 1px solid var(--border); 
+    border-radius: .5rem; 
+  }
+
+  /* --- AJUSTE PARA PANTALLAS GRANDES (ESCRITORIO) --- */
+  @media (min-width: 992px) {
+    .app-shell { 
+      flex-direction: row;
+    }
+    .sidebar { 
+      width: 260px; 
+      min-width: 260px;
+      height: 100vh; 
+      position: sticky; 
+      top: 0; 
+      border-bottom: none;
+      border-right: 1px solid var(--border); 
+    }
+    .content { 
+      padding: 2.5rem; 
+    }
+    .calendar-grid { 
+      gap: .75rem; 
+    }
+    .day-cell { 
+      min-height: 150px; 
+      padding: .75rem; 
+    }
+  }
+
+  /* Adaptación drástica para celulares chicos */
+  @media (max-width: 768px) {
+    .calendar-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr)); /* Formato compacto de grilla en celular */
+    }
+    .day-cell {
+      min-height: 75px;
+    }
+    .table-responsive {
+      border: 0 !important;
+    }
+  }
+
+  /* Clases del Semáforo de Vencimientos */
+  .estado-Pendiente { background: #fee2e2 !important; color: #991b1b !important; border-color: #fecaca; }
+  .estado-En-Proceso { background: #fef3c7 !important; color: #92400e !important; border-color: #fde68a; }
+  .estado-Para-Control { background: #dbeafe !important; color: #1d4ed8 !important; border-color: #bfdbfe; }
+  .estado-Para-Presentar { background: #ede9fe !important; color: #6d28d9 !important; border-color: #ddd6fe; }
+  .estado-Presentado { background: #dcfce7 !important; color: #047857 !important; border-color: #bbf7d0; }
+
+  body.dark .estado-Pendiente { background: rgba(127,29,29,.4) !important; color: #fecaca !important; }
+  body.dark .estado-En-Proceso { background: rgba(120,53,15,.4) !important; color: #fde68a !important; }
+  body.dark .estado-Para-Control { background: rgba(30,64,175,.4) !important; color: #bfdbfe !important; }
+  body.dark .estado-Para-Presentar { background: rgba(91,33,182,.4) !important; color: #ddd6fe !important; }
+  body.dark .estado-Presentado { background: rgba(6,95,70,.4) !important; color: #bbf7d0 !important; }
+</style>

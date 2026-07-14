@@ -1,0 +1,66 @@
+<div class="d-flex flex-wrap justify-content-between gap-3 align-items-center mb-4">
+  <div>
+    <h2 class="mb-1">Panel de Control</h2>
+    <p class="muted mb-0">Resumen operativo del mes seleccionado</p>
+  </div>
+  <div class="d-flex gap-2">
+    <!-- El selector de mes operativo -->
+    <input class="form-control text-light bg-dark border-secondary" type="month" id="dash-month">
+    <button class="btn btn-brand" id="btn-generar">Generar M+1</button>
+  </div>
+</div>
+
+<!-- Fila donde se renderizan las tarjetas KPI vía JS -->
+<div class="row g-3 mb-4" id="kpi-row"></div>
+
+<div class="card-ui p-4">
+  <h3 class="h5 mb-3 text-light">Próximos Vencimientos Contables</h3>
+  <div class="table-responsive">
+    <table class="table align-middle text-light">
+      <thead>
+        <tr class="text-secondary small uppercase fw-bold">
+          <th>Fecha Límite</th>
+          <th>Contribuyente</th>
+          <th>Impuesto</th>
+          <th>Estado</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody id="dash-table"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 🔴 EL MODAL CRÍTICO: Aseguramos que existan exactamente los ID del script -->
+<div class="modal fade" id="dash-task-modal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form class="modal-content card-ui" id="dash-task-form" onsubmit="saveDashTask(event)">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold text-light" id="dash-task-title">Cargando vencimiento...</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-3">
+        <!-- Campo oculto para el ID de vencimiento -->
+        <input type="hidden" name="ID_Vencimiento">
+        
+        <!-- Campo del selector de estados contables -->
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-light mb-2">Estado Actual de la Obligación</label>
+          <select class="form-select text-light bg-dark border-secondary" name="Estado" id="dash-modal-select-estado" required>
+            <!-- Las opciones se inyectan dinámicamente desde Scripts.html -->
+          </select>
+        </div>
+        
+        <!-- Campo de comentarios del operador -->
+        <div class="mb-2">
+          <label class="form-label small fw-semibold text-light mb-2">Comentarios / Notas Internas</label>
+          <textarea class="form-control text-light bg-dark border-secondary" name="Comentario" rows="3" placeholder="Escribí notas de control para el equipo..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0 text-end">
+        <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-brand px-4 fw-bold" type="submit">Guardar Cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
